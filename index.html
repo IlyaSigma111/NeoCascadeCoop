@@ -5,46 +5,90 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NeoCascade Coop - Подводная Лодка</title>
     <link rel="stylesheet" href="styles.css">
-    <script type="module" src="app.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🚢 NeoCascade Coop</h1>
-            <p class="subtitle">Кооперативное управление подводной лодкой</p>
+            <div class="logo">
+                <i class="fas fa-submarine logo-icon"></i>
+                <div>
+                    <h1>NeoCascade Coop</h1>
+                    <p class="subtitle">Кооперативное управление подводной лодкой. Работайте в команде, распределяйте роли, выполняйте миссии!</p>
+                </div>
+            </div>
+            
+            <div class="features">
+                <div class="feature">
+                    <i class="fas fa-users"></i>
+                    <p>До 6 игроков</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-cogs"></i>
+                    <p>Уникальные роли</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-bolt"></i>
+                    <p>Realtime-игра</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-gamepad"></i>
+                    <p>Браузерная</p>
+                </div>
+            </div>
         </header>
 
         <div id="auth-section">
             <div id="user-info" class="hidden">
-                <img id="user-avatar" src="" alt="Аватар">
-                <span id="user-name"></span>
-                <button id="logout-btn" class="btn secondary">Выйти</button>
+                <img id="user-avatar" src="" alt="Аватар" crossorigin="anonymous">
+                <div class="user-details">
+                    <div id="user-name"></div>
+                    <div class="user-email" id="user-email"></div>
+                </div>
+                <button id="logout-btn" class="btn secondary small">
+                    <i class="fas fa-sign-out-alt"></i> Выйти
+                </button>
             </div>
-            <button id="login-btn" class="btn primary">Войти через Google</button>
+            <button id="login-btn" class="btn primary">
+                <i class="fab fa-google"></i> Войти через Google
+            </button>
         </div>
 
         <main id="main-content" class="hidden">
             <div class="game-options">
                 <section class="card">
-                    <h2>Создать новую подлодку</h2>
+                    <h2><i class="fas fa-plus-circle"></i> Создать новую подлодку</h2>
                     <input type="text" id="sub-name" placeholder="Название подлодки (например: 'Нептун')" maxlength="20">
-                    <button id="create-game" class="btn primary">🚢 Создать лодку</button>
+                    <button id="create-game" class="btn primary">
+                        <i class="fas fa-submarine"></i> Создать лодку
+                    </button>
                 </section>
 
                 <section class="card">
-                    <h2>Присоединиться к лодке</h2>
+                    <h2><i class="fas fa-link"></i> Присоединиться к лодке</h2>
                     <input type="text" id="room-code" placeholder="Код комнаты (например: ABC123)" maxlength="6" style="text-transform: uppercase;">
-                    <button id="join-game" class="btn secondary">🔗 Присоединиться</button>
+                    <button id="join-game" class="btn secondary">
+                        <i class="fas fa-plug"></i> Присоединиться
+                    </button>
                 </section>
             </div>
 
             <div class="active-games">
-                <h2>Активные подлодки</h2>
-                <div id="games-list"></div>
+                <h2><i class="fas fa-satellite-dish"></i> Активные подлодки</h2>
+                <div id="games-list">
+                    <div class="loading">
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                    </div>
+                </div>
             </div>
         </main>
 
         <div id="status-message" class="status"></div>
     </div>
+
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>
