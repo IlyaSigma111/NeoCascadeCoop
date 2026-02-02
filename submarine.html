@@ -5,77 +5,127 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Подлодка NeoCascade</title>
     <link rel="stylesheet" href="styles.css">
-    <script type="module" src="submarine.js"></script>
+    <link rel="stylesheet" href="submarine.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="submarine-container">
         <!-- Основная панель -->
         <div class="submarine-main">
-            <div id="submarine-display">
-                <h2 id="sub-name">Загрузка...</h2>
-                <div id="mission-info">
-                    <p>Миссия: <span id="mission-text">-</span></p>
-                    <p>Глубина: <span id="depth">0</span> м</p>
-                    <p>Скорость: <span id="speed">0</span> узлов</p>
+            <div class="submarine-header">
+                <div class="sub-info">
+                    <h2 id="sub-name">Загрузка...</h2>
+                    <div class="mission-info">
+                        <p><i class="fas fa-crosshairs"></i> Миссия: <span id="mission-text">-</span></p>
+                        <p><i class="fas fa-tachometer-alt"></i> Скорость: <span id="speed">0</span> узлов</p>
+                        <p><i class="fas fa-water"></i> Глубина: <span id="depth">0</span> м</p>
+                    </div>
                 </div>
-                
-                <div id="map-display">
-                    <!-- Здесь будет отображаться карта -->
+                <div class="sub-status">
+                    <div class="role-badge" id="current-role">Загрузка...</div>
+                    <button id="leave-game" class="btn danger small">
+                        <i class="fas fa-door-open"></i> Выйти
+                    </button>
+                </div>
+            </div>
+            
+            <div class="submarine-display">
+                <div class="map-container">
+                    <h3><i class="fas fa-map"></i> Карта навигации</h3>
                     <canvas id="map-canvas" width="600" height="400"></canvas>
+                    <div class="coordinates">
+                        <span>Позиция: <span id="pos-coords">X:0, Y:0</span></span>
+                        <span>Цель: <span id="target-coords">X:10, Y:10</span></span>
+                    </div>
                 </div>
                 
-                <div class="system-status">
-                    <div class="system" id="oxygen-system">
-                        <h3>Кислород</h3>
-                        <div class="progress-bar">
-                            <div class="progress good" id="oxygen-bar" style="width: 100%"></div>
+                <div class="systems-panel">
+                    <h3><i class="fas fa-cogs"></i> Системы</h3>
+                    <div class="system-grid">
+                        <div class="system-card" id="oxygen-system">
+                            <div class="system-header">
+                                <i class="fas fa-wind"></i>
+                                <h4>Кислород</h4>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress good" id="oxygen-bar" style="width: 100%"></div>
+                            </div>
+                            <span class="system-value" id="oxygen-value">100%</span>
                         </div>
-                        <span id="oxygen-value">100%</span>
-                    </div>
-                    
-                    <div class="system" id="power-system">
-                        <h3>Энергия</h3>
-                        <div class="progress-bar">
-                            <div class="progress good" id="power-bar" style="width: 100%"></div>
+                        
+                        <div class="system-card" id="power-system">
+                            <div class="system-header">
+                                <i class="fas fa-bolt"></i>
+                                <h4>Энергия</h4>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress good" id="power-bar" style="width: 100%"></div>
+                            </div>
+                            <span class="system-value" id="power-value">100%</span>
                         </div>
-                        <span id="power-value">100%</span>
-                    </div>
-                    
-                    <div class="system" id="hull-system">
-                        <h3>Корпус</h3>
-                        <div class="progress-bar">
-                            <div class="progress good" id="hull-bar" style="width: 100%"></div>
+                        
+                        <div class="system-card" id="hull-system">
+                            <div class="system-header">
+                                <i class="fas fa-shield-alt"></i>
+                                <h4>Корпус</h4>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress good" id="hull-bar" style="width: 100%"></div>
+                            </div>
+                            <span class="system-value" id="hull-value">100%</span>
                         </div>
-                        <span id="hull-value">100%</span>
                     </div>
                 </div>
             </div>
             
-            <!-- Панель управления (зависит от роли) -->
-            <div class="controls" id="controls-panel">
-                <h2 id="role-title">Загрузка роли...</h2>
+            <!-- Панель управления -->
+            <div class="controls-panel" id="controls-panel">
+                <h3 id="role-title">Загрузка роли...</h3>
                 <div id="role-controls">
-                    <!-- Контролы будут загружаться динамически в зависимости от роли -->
+                    <div class="loading">
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                    </div>
                 </div>
             </div>
         </div>
         
-        <!-- Панель игроков -->
-        <div class="players-panel">
-            <h2>Экипаж</h2>
-            <div id="players-list" class="player-list">
-                <!-- Список игроков будет загружаться динамически -->
+        <!-- Боковая панель -->
+        <div class="sidebar">
+            <div class="players-panel">
+                <h3><i class="fas fa-users"></i> Экипаж (<span id="players-count">0</span>/6)</h3>
+                <div id="players-list" class="player-list">
+                    <!-- Игроки загрузятся здесь -->
+                </div>
             </div>
             
-            <div id="alerts-panel">
-                <h3>Сигналы тревоги</h3>
-                <div id="alerts-list"></div>
+            <div class="alerts-panel">
+                <h3><i class="fas fa-exclamation-triangle"></i> Сигналы тревоги</h3>
+                <div id="alerts-list">
+                    <div class="alert">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Добро пожаловать на борт!</span>
+                    </div>
+                </div>
             </div>
             
-            <button id="leave-game" class="btn danger" style="margin-top: 20px; width: 100%;">
-                🚪 Покинуть подлодку
-            </button>
+            <div class="chat-panel">
+                <h3><i class="fas fa-comments"></i> Чат экипажа</h3>
+                <div id="chat-messages">
+                    <!-- Сообщения чата -->
+                </div>
+                <div class="chat-input">
+                    <input type="text" id="chat-input" placeholder="Введите сообщение...">
+                    <button id="send-chat" class="btn primary small">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
+
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="submarine.js"></script>
 </body>
 </html>
