@@ -25,16 +25,9 @@ const gamesList = document.getElementById('games-list');
 const statusMessage = document.getElementById('status-message');
 
 // Роли для подлодки
-const ROLES = [
-    'Капитан',
-    'Штурман', 
-    'Инженер',
-    'Акустик',
-    'Оружейник',
-    'Связист'
-];
+const ROLES = ['Капитан', 'Штурман', 'Инженер', 'Акустик', 'Оружейник', 'Связист'];
 
-// Показать статус сообщение
+// Показать статус
 function showStatus(message, type = 'info', duration = 3000) {
     statusMessage.innerHTML = '';
     
@@ -76,7 +69,8 @@ function updateUIAfterLogin(user) {
     if (user.photoURL) {
         userAvatar.src = user.photoURL;
     } else {
-        userAvatar.src = 'https://via.placeholder.com/50/0066cc/ffffff?text=' + user.displayName?.charAt(0) || 'U';
+        const initial = user.displayName?.charAt(0) || 'U';
+        userAvatar.src = `https://ui-avatars.com/api/?name=${initial}&background=0066cc&color=fff&size=100`;
     }
     
     userName.textContent = user.displayName || 'Пользователь';
@@ -89,7 +83,7 @@ function updateUIAfterLogin(user) {
     loadActiveGames();
 }
 
-// Слушатель состояния аутентификации
+// Слушатель авторизации
 onAuthStateChanged(auth, (user) => {
     if (user) {
         updateUIAfterLogin(user);
@@ -101,18 +95,21 @@ onAuthStateChanged(auth, (user) => {
         gamesList.innerHTML = '<div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>';
     }
 }, (error) => {
-    console.error('Auth state error:', error);
-    showStatus('Ошибка авторизации: ' + error.message, 'error');
+    console.error('Auth error:', error);
+    showStatus('Ошибка авторизации', 'error');
 });
 
 // Вход через Google
 loginBtn.addEventListener('click', async () => {
     try {
+        loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Загрузка...';
+        loginBtn.disabled = true;
+        
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
         showStatus(`Добро пожаловать, ${user.displayName || 'Пользователь'}!`, 'success');
     } catch (error) {
-        console.error('Ошибка входа:', error);
+        console.error('Login error:', error);
         
         let errorMessage = 'Ошибка входа';
         switch(error.code) {
@@ -123,13 +120,16 @@ loginBtn.addEventListener('click', async () => {
                 errorMessage = 'Вы закрыли окно входа. Попробуйте снова.';
                 break;
             case 'auth/unauthorized-domain':
-                errorMessage = 'Домен не авторизован. Добавьте ваш домен в Firebase Console в разделе Authentication → Settings → Authorized domains';
+                errorMessage = 'Домен не авторизован. Добавьте ваш домен в Firebase Console.';
                 break;
             default:
                 errorMessage = error.message;
         }
         
         showStatus(errorMessage, 'error', 5000);
+    } finally {
+        loginBtn.innerHTML = '<i class="fab fa-google"></i> Войти через Google';
+        loginBtn.disabled = false;
     }
 });
 
@@ -139,12 +139,12 @@ logoutBtn.addEventListener('click', async () => {
         await signOut(auth);
         showStatus('Вы вышли из системы', 'info');
     } catch (error) {
-        console.error('Ошибка выхода:', error);
-        showStatus('Ошибка выхода: ' + error.message, 'error');
+        console.error('Logout error:', error);
+        showStatus('Ошибка выхода', 'error');
     }
 });
 
-// Создание новой игры
+// Создание игры
 createGameBtn.addEventListener('click', async () => {
     if (!currentUser) {
         showStatus('Сначала войдите в систему', 'error');
@@ -163,19 +163,19 @@ createGameBtn.addEventListener('click', async () => {
         return;
     }
     
+    createGameBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Создание...';
+    createGameBtn.disabled = true;
+    
     const roomCode = generateRoomCode();
     const gameRef = ref(database, `games/${roomCode}`);
     
     try {
-        // Проверить, существует ли уже комната
         const snapshot = await get(gameRef);
         if (snapshot.exists()) {
-            // Если код уже существует, генерируем новый
             createGameBtn.click();
             return;
         }
         
-        // Создать новую игру
         const newGame = {
             name: subName,
             code: roomCode,
@@ -201,13 +201,7 @@ createGameBtn.addEventListener('click', async () => {
                 oxygen: 100,
                 power: 100,
                 hull: 100,
-                systems: {
-                    engines: 100,
-                    sonar: 100,
-                    weapons: 100,
-                    comms: 100,
-                    lifeSupport: 100
-                },
+                systems: { engines: 100, sonar: 100, weapons: 100, comms: 100, lifeSupport: 100 },
                 location: { x: 0, y: 0 },
                 target: { x: 10, y: 10 },
                 mission: 'Патрулирование',
@@ -218,15 +212,19 @@ createGameBtn.addEventListener('click', async () => {
         await set(gameRef, newGame);
         showStatus(`Подлодка "${subName}" создана! Код: ${roomCode}`, 'success');
         
-        // Сохранить в localStorage и перейти
         localStorage.setItem('neocascade_room', roomCode);
         localStorage.setItem('neocascade_role', ROLES[0]);
         localStorage.setItem('neocascade_userId', currentUser.uid);
-        window.location.href = 'submarine.html';
+        setTimeout(() => {
+            window.location.href = 'submarine.html';
+        }, 1500);
         
     } catch (error) {
-        console.error('Ошибка создания игры:', error);
-        showStatus('Ошибка создания игры: ' + error.message, 'error');
+        console.error('Create game error:', error);
+        showStatus('Ошибка создания игры', 'error');
+    } finally {
+        createGameBtn.innerHTML = '<i class="fas fa-submarine"></i> Создать лодку';
+        createGameBtn.disabled = false;
     }
 });
 
@@ -239,44 +237,45 @@ joinGameBtn.addEventListener('click', async () => {
     
     const roomCode = roomCodeInput.value.trim().toUpperCase();
     if (!roomCode || roomCode.length !== 6) {
-        showStatus('Введите корректный код комнаты (6 символов)', 'error');
+        showStatus('Введите корректный код (6 символов)', 'error');
         roomCodeInput.focus();
         return;
     }
+    
+    joinGameBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Подключение...';
+    joinGameBtn.disabled = true;
     
     const gameRef = ref(database, `games/${roomCode}`);
     
     try {
         const snapshot = await get(gameRef);
         if (!snapshot.exists()) {
-            showStatus('Игра не найдена. Проверьте код комнаты.', 'error');
+            showStatus('Игра не найдена', 'error');
             return;
         }
         
         const game = snapshot.val();
         
-        // Проверить, не присоединился ли уже
         if (game.players && game.players[currentUser.uid]) {
             showStatus('Вы уже в этой игре', 'warning');
             localStorage.setItem('neocascade_room', roomCode);
             localStorage.setItem('neocascade_role', game.players[currentUser.uid].role);
             localStorage.setItem('neocascade_userId', currentUser.uid);
-            window.location.href = 'submarine.html';
+            setTimeout(() => {
+                window.location.href = 'submarine.html';
+            }, 1000);
             return;
         }
         
-        // Проверить наличие мест
         if (game.currentPlayers >= game.maxPlayers) {
-            showStatus('Игра заполнена. Максимум 6 игроков.', 'error');
+            showStatus('Игра заполнена', 'error');
             return;
         }
         
-        // Определить роль
         const playerCount = game.currentPlayers || 1;
         const roleIndex = Math.min(playerCount, ROLES.length - 1);
-        const role = ROLES[roleIndex] || `Экипаж ${playerCount + 1}`;
+        const role = ROLES[roleIndex];
         
-        // Обновить игру
         const updates = {};
         updates[`players/${currentUser.uid}`] = {
             name: currentUser.displayName || 'Аноним',
@@ -291,24 +290,25 @@ joinGameBtn.addEventListener('click', async () => {
         await update(gameRef, updates);
         showStatus(`Присоединились к "${game.name}" как ${role}`, 'success');
         
-        // Сохранить и перейти
         localStorage.setItem('neocascade_room', roomCode);
         localStorage.setItem('neocascade_role', role);
         localStorage.setItem('neocascade_userId', currentUser.uid);
-        window.location.href = 'submarine.html';
+        setTimeout(() => {
+            window.location.href = 'submarine.html';
+        }, 1500);
         
     } catch (error) {
-        console.error('Ошибка присоединения:', error);
-        showStatus('Ошибка присоединения: ' + error.message, 'error');
+        console.error('Join error:', error);
+        showStatus('Ошибка присоединения', 'error');
+    } finally {
+        joinGameBtn.innerHTML = '<i class="fas fa-plug"></i> Присоединиться';
+        joinGameBtn.disabled = false;
     }
 });
 
-// Загрузка активных игр
+// Загрузка игр
 function loadActiveGames() {
-    // Удалить предыдущий слушатель
-    if (gamesListener) {
-        gamesListener();
-    }
+    if (gamesListener) gamesListener();
     
     const gamesRef = ref(database, 'games');
     
@@ -319,7 +319,7 @@ function loadActiveGames() {
             gamesList.innerHTML = `
                 <div class="no-games">
                     <i class="fas fa-water"></i>
-                    <p>Нет активных подлодок. Создайте первую!</p>
+                    <p>Нет активных подлодок</p>
                 </div>
             `;
             return;
@@ -334,7 +334,7 @@ function loadActiveGames() {
             gamesList.innerHTML = `
                 <div class="no-games">
                     <i class="fas fa-water"></i>
-                    <p>Нет активных подлодок. Создайте первую!</p>
+                    <p>Нет активных подлодок</p>
                 </div>
             `;
             return;
@@ -362,7 +362,6 @@ function loadActiveGames() {
             gamesList.appendChild(gameCard);
         });
         
-        // Обработчики для кнопок
         document.querySelectorAll('.join-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -372,7 +371,6 @@ function loadActiveGames() {
             });
         });
         
-        // Клик по карточке игры
         document.querySelectorAll('.game-card').forEach(card => {
             card.addEventListener('click', (e) => {
                 if (!e.target.classList.contains('join-btn')) {
@@ -384,44 +382,49 @@ function loadActiveGames() {
         });
         
     }, (error) => {
-        console.error('Ошибка загрузки игр:', error);
+        console.error('Load games error:', error);
         gamesList.innerHTML = `
             <div class="no-games">
                 <i class="fas fa-exclamation-triangle"></i>
-                <p>Ошибка загрузки игр. Проверьте подключение.</p>
+                <p>Ошибка загрузки</p>
             </div>
         `;
     });
 }
 
-// Очистка при закрытии
+// Очистка
 window.addEventListener('beforeunload', () => {
-    if (gamesListener) {
-        gamesListener();
-    }
+    if (gamesListener) gamesListener();
 });
 
-// Enter для полей ввода
+// Enter для полей
 subNameInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        createGameBtn.click();
-    }
+    if (e.key === 'Enter') createGameBtn.click();
 });
 
 roomCodeInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        joinGameBtn.click();
-    }
+    if (e.key === 'Enter') joinGameBtn.click();
 });
 
-// Автоматический фокус
+// Автофокус
 document.addEventListener('DOMContentLoaded', () => {
-    if (auth.currentUser) {
-        // Уже авторизован
-    } else {
-        // Автофокус на поле ввода при загрузке
-        setTimeout(() => {
-            if (subNameInput) subNameInput.focus();
-        }, 500);
+    if (!auth.currentUser) {
+        setTimeout(() => subNameInput?.focus(), 300);
     }
+    
+    // Pull to refresh для мобилок
+    let startY = 0;
+    document.addEventListener('touchstart', (e) => {
+        startY = e.touches[0].pageY;
+    }, { passive: true });
+    
+    document.addEventListener('touchmove', (e) => {
+        const currentY = e.touches[0].pageY;
+        const diff = currentY - startY;
+        
+        if (diff > 100 && window.scrollY <= 0) {
+            loadActiveGames();
+            showStatus('Список обновлён', 'success');
+        }
+    }, { passive: true });
 });
