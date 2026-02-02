@@ -2,86 +2,636 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>Подлодка NeoCascade</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="submarine.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Дополнительные стили для игровой страницы */
+        .submarine-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+
+        /* Хедер подлодки */
+        .sub-header {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: var(--glass-bg);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        @media (min-width: 768px) {
+            .sub-header {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+            }
+        }
+
+        .sub-info h2 {
+            font-size: 1.6rem;
+            color: var(--secondary);
+            margin-bottom: 8px;
+            line-height: 1.2;
+        }
+
+        .mission-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .mission-info p {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: var(--gray);
+        }
+
+        .mission-info i {
+            color: var(--secondary);
+            font-size: 1rem;
+        }
+
+        .role-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        @media (min-width: 768px) {
+            .role-section {
+                align-items: flex-end;
+            }
+        }
+
+        .role-badge {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 1rem;
+            text-align: center;
+            min-width: 140px;
+        }
+
+        /* Основная сетка */
+        .sub-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        @media (min-width: 1024px) {
+            .sub-grid {
+                grid-template-columns: 2fr 1fr;
+            }
+        }
+
+        /* Карта */
+        .map-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--glass-border);
+            order: 1;
+        }
+
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .map-header h3 {
+            color: var(--light);
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .coordinates {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: var(--gray);
+            margin-top: 15px;
+        }
+
+        @media (min-width: 480px) {
+            .coordinates {
+                flex-direction: row;
+                justify-content: space-between;
+            }
+        }
+
+        #map-canvas {
+            width: 100%;
+            height: 300px;
+            background: #0a192f;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            touch-action: none;
+        }
+
+        @media (min-width: 768px) {
+            #map-canvas {
+                height: 350px;
+            }
+        }
+
+        /* Системы */
+        .systems-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--glass-border);
+            order: 2;
+        }
+
+        .systems-container h3 {
+            color: var(--light);
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .system-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+        }
+
+        .system-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .system-card:active {
+            transform: scale(0.98);
+        }
+
+        .system-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .system-header i {
+            font-size: 1.4rem;
+            color: var(--secondary);
+        }
+
+        .system-header h4 {
+            font-size: 1.1rem;
+            color: var(--light);
+        }
+
+        /* Управление */
+        .controls-container {
+            background: var(--glass-bg);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            order: 3;
+            grid-column: 1 / -1;
+        }
+
+        .controls-container h3 {
+            color: var(--light);
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .role-controls {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .control-group h4 {
+            color: var(--light);
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .slider-container label {
+            min-width: 90px;
+            color: var(--gray);
+            font-size: 0.95rem;
+        }
+
+        .slider-container input[type="range"] {
+            flex: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            background: var(--secondary);
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .slider-output {
+            min-width: 70px;
+            text-align: right;
+            color: var(--light);
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        /* Боковая панель */
+        .sidebar {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            order: 4;
+        }
+
+        @media (min-width: 1024px) {
+            .sidebar {
+                order: 2;
+                grid-template-rows: auto auto auto;
+            }
+        }
+
+        /* Панель игроков */
+        .players-panel {
+            background: var(--glass-bg);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .players-panel h3 {
+            color: var(--light);
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #players-count {
+            color: var(--secondary);
+            font-weight: 600;
+        }
+
+        .player-list {
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .player {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .player:active {
+            transform: scale(0.98);
+        }
+
+        .player-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            border: 2px solid var(--primary);
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .player-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .player-name {
+            font-weight: 600;
+            color: var(--light);
+            margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-role {
+            font-size: 0.85rem;
+            color: var(--gray);
+        }
+
+        .player-you {
+            color: var(--success);
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            background: rgba(46, 213, 115, 0.2);
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        /* Панель алертов */
+        .alerts-panel {
+            background: var(--glass-bg);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .alerts-panel h3 {
+            color: var(--light);
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #alerts-list {
+            max-height: 200px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .alert {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px;
+            background: rgba(255, 165, 2, 0.1);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--warning);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .alert i {
+            color: var(--warning);
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .alert span {
+            flex: 1;
+            font-size: 0.9rem;
+            color: var(--light);
+            line-height: 1.4;
+        }
+
+        /* Чат */
+        .chat-panel {
+            background: var(--glass-bg);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .chat-panel h3 {
+            color: var(--light);
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #chat-messages {
+            height: 180px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            padding-right: 5px;
+        }
+
+        .chat-message {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            font-size: 0.9rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .chat-message .sender {
+            font-weight: 600;
+            color: var(--secondary);
+            margin-right: 5px;
+        }
+
+        .chat-message .role {
+            font-size: 0.8rem;
+            color: var(--gray);
+            margin-right: 5px;
+        }
+
+        .chat-message .time {
+            font-size: 0.8rem;
+            color: var(--gray);
+            float: right;
+        }
+
+        .chat-message .text {
+            display: block;
+            margin-top: 5px;
+            color: var(--light);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #chat-input {
+            flex: 1;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--light);
+            font-size: 0.95rem;
+            -webkit-appearance: none;
+        }
+
+        #chat-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+        }
+
+        #send-chat {
+            padding: 12px 20px;
+            min-width: 50px;
+        }
+
+        /* Анимации */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Ландшафтная ориентация */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .sub-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .controls-container {
+                grid-column: 1 / -1;
+            }
+            
+            #map-canvas {
+                height: 200px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="submarine-container">
-        <!-- Основная панель -->
-        <div class="submarine-main">
-            <div class="submarine-header">
-                <div class="sub-info">
-                    <h2 id="sub-name">Загрузка...</h2>
-                    <div class="mission-info">
-                        <p><i class="fas fa-crosshairs"></i> Миссия: <span id="mission-text">-</span></p>
-                        <p><i class="fas fa-tachometer-alt"></i> Скорость: <span id="speed">0</span> узлов</p>
-                        <p><i class="fas fa-water"></i> Глубина: <span id="depth">0</span> м</p>
-                    </div>
-                </div>
-                <div class="sub-status">
-                    <div class="role-badge" id="current-role">Загрузка...</div>
-                    <button id="leave-game" class="btn danger small">
-                        <i class="fas fa-door-open"></i> Выйти
-                    </button>
+        <!-- Хедер -->
+        <div class="sub-header">
+            <div class="sub-info">
+                <h2 id="sub-name">Загрузка...</h2>
+                <div class="mission-info">
+                    <p><i class="fas fa-crosshairs"></i> Миссия: <span id="mission-text">-</span></p>
+                    <p><i class="fas fa-tachometer-alt"></i> Скорость: <span id="speed">0</span> узлов</p>
+                    <p><i class="fas fa-water"></i> Глубина: <span id="depth">0</span> м</p>
+                    <p><i class="fas fa-map-marker-alt"></i> Позиция: <span id="pos-coords">0,0</span></p>
                 </div>
             </div>
-            
-            <div class="submarine-display">
-                <div class="map-container">
-                    <h3><i class="fas fa-map"></i> Карта навигации</h3>
-                    <canvas id="map-canvas" width="600" height="400"></canvas>
+            <div class="role-section">
+                <div class="role-badge" id="current-role">Загрузка...</div>
+                <button id="leave-game" class="btn danger small">
+                    <i class="fas fa-door-open"></i> Выйти
+                </button>
+            </div>
+        </div>
+
+        <!-- Основная сетка -->
+        <div class="sub-grid">
+            <!-- Карта -->
+            <div class="map-container">
+                <div class="map-header">
+                    <h3><i class="fas fa-map"></i> Карта</h3>
                     <div class="coordinates">
-                        <span>Позиция: <span id="pos-coords">X:0, Y:0</span></span>
-                        <span>Цель: <span id="target-coords">X:10, Y:10</span></span>
+                        <span>Цель: <span id="target-coords">10,10</span></span>
                     </div>
                 </div>
-                
-                <div class="systems-panel">
-                    <h3><i class="fas fa-cogs"></i> Системы</h3>
-                    <div class="system-grid">
-                        <div class="system-card" id="oxygen-system">
-                            <div class="system-header">
-                                <i class="fas fa-wind"></i>
-                                <h4>Кислород</h4>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress good" id="oxygen-bar" style="width: 100%"></div>
-                            </div>
-                            <span class="system-value" id="oxygen-value">100%</span>
+                <canvas id="map-canvas" width="600" height="400"></canvas>
+            </div>
+
+            <!-- Системы -->
+            <div class="systems-container">
+                <h3><i class="fas fa-cogs"></i> Системы</h3>
+                <div class="system-grid">
+                    <div class="system-card" id="oxygen-system">
+                        <div class="system-header">
+                            <i class="fas fa-wind"></i>
+                            <h4>Кислород</h4>
                         </div>
-                        
-                        <div class="system-card" id="power-system">
-                            <div class="system-header">
-                                <i class="fas fa-bolt"></i>
-                                <h4>Энергия</h4>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress good" id="power-bar" style="width: 100%"></div>
-                            </div>
-                            <span class="system-value" id="power-value">100%</span>
+                        <div class="progress-bar">
+                            <div class="progress good" id="oxygen-bar" style="width: 100%"></div>
                         </div>
-                        
-                        <div class="system-card" id="hull-system">
-                            <div class="system-header">
-                                <i class="fas fa-shield-alt"></i>
-                                <h4>Корпус</h4>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress good" id="hull-bar" style="width: 100%"></div>
-                            </div>
-                            <span class="system-value" id="hull-value">100%</span>
+                        <span class="system-value" id="oxygen-value">100%</span>
+                    </div>
+                    
+                    <div class="system-card" id="power-system">
+                        <div class="system-header">
+                            <i class="fas fa-bolt"></i>
+                            <h4>Энергия</h4>
                         </div>
+                        <div class="progress-bar">
+                            <div class="progress good" id="power-bar" style="width: 100%"></div>
+                        </div>
+                        <span class="system-value" id="power-value">100%</span>
+                    </div>
+                    
+                    <div class="system-card" id="hull-system">
+                        <div class="system-header">
+                            <i class="fas fa-shield-alt"></i>
+                            <h4>Корпус</h4>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress good" id="hull-bar" style="width: 100%"></div>
+                        </div>
+                        <span class="system-value" id="hull-value">100%</span>
                     </div>
                 </div>
             </div>
-            
-            <!-- Панель управления -->
-            <div class="controls-panel" id="controls-panel">
-                <h3 id="role-title">Загрузка роли...</h3>
-                <div id="role-controls">
+
+            <!-- Управление -->
+            <div class="controls-container">
+                <h3 id="role-title"><i class="fas fa-user-cog"></i> Загрузка роли...</h3>
+                <div id="role-controls" class="role-controls">
                     <div class="loading">
                         <div class="loading-dot"></div>
                         <div class="loading-dot"></div>
@@ -89,40 +639,51 @@
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- Боковая панель -->
-        <div class="sidebar">
-            <div class="players-panel">
-                <h3><i class="fas fa-users"></i> Экипаж (<span id="players-count">0</span>/6)</h3>
-                <div id="players-list" class="player-list">
-                    <!-- Игроки загрузятся здесь -->
+
+            <!-- Боковая панель -->
+            <div class="sidebar">
+                <!-- Игроки -->
+                <div class="players-panel">
+                    <h3><i class="fas fa-users"></i> Экипаж (<span id="players-count">0</span>/6)</h3>
+                    <div id="players-list" class="player-list">
+                        <!-- Игроки загрузятся здесь -->
+                    </div>
                 </div>
-            </div>
-            
-            <div class="alerts-panel">
-                <h3><i class="fas fa-exclamation-triangle"></i> Сигналы тревоги</h3>
-                <div id="alerts-list">
-                    <div class="alert">
-                        <i class="fas fa-info-circle"></i>
-                        <span>Добро пожаловать на борт!</span>
+
+                <!-- Алерты -->
+                <div class="alerts-panel">
+                    <h3><i class="fas fa-exclamation-triangle"></i> Сигналы</h3>
+                    <div id="alerts-list">
+                        <div class="alert">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Добро пожаловать на борт!</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Чат -->
+                <div class="chat-panel">
+                    <h3><i class="fas fa-comments"></i> Чат</h3>
+                    <div id="chat-messages">
+                        <!-- Сообщения чата -->
+                    </div>
+                    <div class="chat-input-container">
+                        <input type="text" id="chat-input" placeholder="Сообщение...">
+                        <button id="send-chat" class="btn primary small">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
                     </div>
                 </div>
             </div>
-            
-            <div class="chat-panel">
-                <h3><i class="fas fa-comments"></i> Чат экипажа</h3>
-                <div id="chat-messages">
-                    <!-- Сообщения чата -->
-                </div>
-                <div class="chat-input">
-                    <input type="text" id="chat-input" placeholder="Введите сообщение...">
-                    <button id="send-chat" class="btn primary small">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
-            </div>
         </div>
+
+        <!-- Подсказка свайпа -->
+        <div class="swipe-hint">
+            <i class="fas fa-hand-point-up"></i> Листайте вниз для обновления
+        </div>
+
+        <!-- Статус -->
+        <div id="status-message" class="status"></div>
     </div>
 
     <script type="module" src="firebase-config.js"></script>
