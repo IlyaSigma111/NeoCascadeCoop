@@ -15,6 +15,7 @@ const logoutBtn = document.getElementById('logout-btn');
 const userInfo = document.getElementById('user-info');
 const userAvatar = document.getElementById('user-avatar');
 const userName = document.getElementById('user-name');
+const userEmail = document.getElementById('user-email');
 const mainContent = document.getElementById('main-content');
 const createGameBtn = document.getElementById('create-game');
 const joinGameBtn = document.getElementById('join-game');
@@ -23,23 +24,39 @@ const roomCodeInput = document.getElementById('room-code');
 const gamesList = document.getElementById('games-list');
 const statusMessage = document.getElementById('status-message');
 
-// Роли для подлодки (по количеству игроков)
+// Роли для подлодки
 const ROLES = [
-    'Капитан',       // 1 игрок - управление, общее принятие решений
-    'Штурман',       // 2 игрока - навигация, карта
-    'Инженер',       // 3 игрока - системы, ремонт
-    'Акустик',       // 4 игрока - гидролокатор, обнаружение
-    'Оружейник',     // 5 игроков - вооружение, торпеды
-    'Связист'        // 6 игроков - связь, переговоры
+    'Капитан',
+    'Штурман', 
+    'Инженер',
+    'Акустик',
+    'Оружейник',
+    'Связист'
 ];
 
 // Показать статус сообщение
-function showStatus(message, type = 'info') {
-    statusMessage.textContent = message;
+function showStatus(message, type = 'info', duration = 3000) {
+    statusMessage.innerHTML = '';
+    
+    const iconMap = {
+        success: 'check-circle',
+        error: 'exclamation-circle',
+        warning: 'exclamation-triangle',
+        info: 'info-circle'
+    };
+    
+    const icon = iconMap[type] || 'info-circle';
+    
+    statusMessage.innerHTML = `
+        <i class="fas fa-${icon}"></i>
+        <span>${message}</span>
+    `;
+    
     statusMessage.className = `status show ${type}`;
+    
     setTimeout(() => {
         statusMessage.classList.remove('show');
-    }, 3000);
+    }, duration);
 }
 
 // Генерация кода комнаты
@@ -52,34 +69,67 @@ function generateRoomCode() {
     return code;
 }
 
+// Обновить UI после входа
+function updateUIAfterLogin(user) {
+    currentUser = user;
+    
+    if (user.photoURL) {
+        userAvatar.src = user.photoURL;
+    } else {
+        userAvatar.src = 'https://via.placeholder.com/50/0066cc/ffffff?text=' + user.displayName?.charAt(0) || 'U';
+    }
+    
+    userName.textContent = user.displayName || 'Пользователь';
+    userEmail.textContent = user.email || '';
+    
+    userInfo.classList.remove('hidden');
+    loginBtn.classList.add('hidden');
+    mainContent.classList.remove('hidden');
+    
+    loadActiveGames();
+}
+
 // Слушатель состояния аутентификации
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        currentUser = user;
-        userAvatar.src = user.photoURL;
-        userName.textContent = user.displayName;
-        userInfo.classList.remove('hidden');
-        loginBtn.classList.add('hidden');
-        mainContent.classList.remove('hidden');
-        
-        // Загрузить активные игры
-        loadActiveGames();
+        updateUIAfterLogin(user);
     } else {
         currentUser = null;
         userInfo.classList.add('hidden');
         loginBtn.classList.remove('hidden');
         mainContent.classList.add('hidden');
+        gamesList.innerHTML = '<div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>';
     }
+}, (error) => {
+    console.error('Auth state error:', error);
+    showStatus('Ошибка авторизации: ' + error.message, 'error');
 });
 
 // Вход через Google
 loginBtn.addEventListener('click', async () => {
     try {
-        await signInWithPopup(auth, provider);
-        showStatus('Успешный вход!', 'success');
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        showStatus(`Добро пожаловать, ${user.displayName || 'Пользователь'}!`, 'success');
     } catch (error) {
         console.error('Ошибка входа:', error);
-        showStatus('Ошибка входа: ' + error.message, 'error');
+        
+        let errorMessage = 'Ошибка входа';
+        switch(error.code) {
+            case 'auth/popup-blocked':
+                errorMessage = 'Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для этого сайта.';
+                break;
+            case 'auth/popup-closed-by-user':
+                errorMessage = 'Вы закрыли окно входа. Попробуйте снова.';
+                break;
+            case 'auth/unauthorized-domain':
+                errorMessage = 'Домен не авторизован. Добавьте ваш домен в Firebase Console в разделе Authentication → Settings → Authorized domains';
+                break;
+            default:
+                errorMessage = error.message;
+        }
+        
+        showStatus(errorMessage, 'error', 5000);
     }
 });
 
@@ -90,6 +140,7 @@ logoutBtn.addEventListener('click', async () => {
         showStatus('Вы вышли из системы', 'info');
     } catch (error) {
         console.error('Ошибка выхода:', error);
+        showStatus('Ошибка выхода: ' + error.message, 'error');
     }
 });
 
@@ -103,6 +154,12 @@ createGameBtn.addEventListener('click', async () => {
     const subName = subNameInput.value.trim();
     if (!subName) {
         showStatus('Введите название подлодки', 'error');
+        subNameInput.focus();
+        return;
+    }
+    
+    if (subName.length < 2) {
+        showStatus('Название должно быть не менее 2 символов', 'error');
         return;
     }
     
@@ -110,10 +167,11 @@ createGameBtn.addEventListener('click', async () => {
     const gameRef = ref(database, `games/${roomCode}`);
     
     try {
-        // Проверить, существует ли уже комната с таким кодом
+        // Проверить, существует ли уже комната
         const snapshot = await get(gameRef);
         if (snapshot.exists()) {
-            showStatus('Ошибка: комната уже существует', 'error');
+            // Если код уже существует, генерируем новый
+            createGameBtn.click();
             return;
         }
         
@@ -123,14 +181,15 @@ createGameBtn.addEventListener('click', async () => {
             code: roomCode,
             createdAt: Date.now(),
             captain: currentUser.uid,
-            captainName: currentUser.displayName,
-            captainAvatar: currentUser.photoURL,
+            captainName: currentUser.displayName || 'Аноним',
+            captainAvatar: currentUser.photoURL || '',
             players: {
                 [currentUser.uid]: {
-                    name: currentUser.displayName,
-                    avatar: currentUser.photoURL,
-                    role: ROLES[0], // Капитан для создателя
-                    joinedAt: Date.now()
+                    name: currentUser.displayName || 'Аноним',
+                    avatar: currentUser.photoURL || '',
+                    role: ROLES[0],
+                    joinedAt: Date.now(),
+                    online: true
                 }
             },
             status: 'waiting',
@@ -150,7 +209,7 @@ createGameBtn.addEventListener('click', async () => {
                     lifeSupport: 100
                 },
                 location: { x: 0, y: 0 },
-                target: { x: 0, y: 0 },
+                target: { x: 10, y: 10 },
                 mission: 'Патрулирование',
                 alerts: []
             }
@@ -159,9 +218,10 @@ createGameBtn.addEventListener('click', async () => {
         await set(gameRef, newGame);
         showStatus(`Подлодка "${subName}" создана! Код: ${roomCode}`, 'success');
         
-        // Сохранить код в localStorage и перейти к игре
+        // Сохранить в localStorage и перейти
         localStorage.setItem('neocascade_room', roomCode);
         localStorage.setItem('neocascade_role', ROLES[0]);
+        localStorage.setItem('neocascade_userId', currentUser.uid);
         window.location.href = 'submarine.html';
         
     } catch (error) {
@@ -180,6 +240,7 @@ joinGameBtn.addEventListener('click', async () => {
     const roomCode = roomCodeInput.value.trim().toUpperCase();
     if (!roomCode || roomCode.length !== 6) {
         showStatus('Введите корректный код комнаты (6 символов)', 'error');
+        roomCodeInput.focus();
         return;
     }
     
@@ -188,49 +249,52 @@ joinGameBtn.addEventListener('click', async () => {
     try {
         const snapshot = await get(gameRef);
         if (!snapshot.exists()) {
-            showStatus('Игра не найдена', 'error');
+            showStatus('Игра не найдена. Проверьте код комнаты.', 'error');
             return;
         }
         
         const game = snapshot.val();
         
-        // Проверить, не присоединился ли уже игрок
+        // Проверить, не присоединился ли уже
         if (game.players && game.players[currentUser.uid]) {
             showStatus('Вы уже в этой игре', 'warning');
-            // Перейти к игре
             localStorage.setItem('neocascade_room', roomCode);
             localStorage.setItem('neocascade_role', game.players[currentUser.uid].role);
+            localStorage.setItem('neocascade_userId', currentUser.uid);
             window.location.href = 'submarine.html';
             return;
         }
         
-        // Проверить, есть ли свободные места
+        // Проверить наличие мест
         if (game.currentPlayers >= game.maxPlayers) {
-            showStatus('Игра заполнена', 'error');
+            showStatus('Игра заполнена. Максимум 6 игроков.', 'error');
             return;
         }
         
-        // Определить роль (по количеству игроков)
+        // Определить роль
         const playerCount = game.currentPlayers || 1;
-        const role = ROLES[playerCount] || `Экипаж ${playerCount + 1}`;
+        const roleIndex = Math.min(playerCount, ROLES.length - 1);
+        const role = ROLES[roleIndex] || `Экипаж ${playerCount + 1}`;
         
         // Обновить игру
         const updates = {};
         updates[`players/${currentUser.uid}`] = {
-            name: currentUser.displayName,
-            avatar: currentUser.photoURL,
+            name: currentUser.displayName || 'Аноним',
+            avatar: currentUser.photoURL || '',
             role: role,
-            joinedAt: Date.now()
+            joinedAt: Date.now(),
+            online: true
         };
         updates['currentPlayers'] = playerCount + 1;
         updates['status'] = 'active';
         
         await update(gameRef, updates);
-        showStatus(`Присоединились к подлодке "${game.name}" как ${role}`, 'success');
+        showStatus(`Присоединились к "${game.name}" как ${role}`, 'success');
         
-        // Сохранить данные и перейти к игре
+        // Сохранить и перейти
         localStorage.setItem('neocascade_room', roomCode);
         localStorage.setItem('neocascade_role', role);
+        localStorage.setItem('neocascade_userId', currentUser.uid);
         window.location.href = 'submarine.html';
         
     } catch (error) {
@@ -241,7 +305,7 @@ joinGameBtn.addEventListener('click', async () => {
 
 // Загрузка активных игр
 function loadActiveGames() {
-    // Удалить предыдущий слушатель, если есть
+    // Удалить предыдущий слушатель
     if (gamesListener) {
         gamesListener();
     }
@@ -252,7 +316,12 @@ function loadActiveGames() {
         gamesList.innerHTML = '';
         
         if (!snapshot.exists()) {
-            gamesList.innerHTML = '<p class="no-games">Нет активных подлодок</p>';
+            gamesList.innerHTML = `
+                <div class="no-games">
+                    <i class="fas fa-water"></i>
+                    <p>Нет активных подлодок. Создайте первую!</p>
+                </div>
+            `;
             return;
         }
         
@@ -262,7 +331,12 @@ function loadActiveGames() {
             .sort((a, b) => b[1].createdAt - a[1].createdAt);
         
         if (gamesArray.length === 0) {
-            gamesList.innerHTML = '<p class="no-games">Нет активных подлодок</p>';
+            gamesList.innerHTML = `
+                <div class="no-games">
+                    <i class="fas fa-water"></i>
+                    <p>Нет активных подлодок. Создайте первую!</p>
+                </div>
+            `;
             return;
         }
         
@@ -271,18 +345,24 @@ function loadActiveGames() {
             gameCard.className = 'game-card';
             gameCard.innerHTML = `
                 <h3>${game.name}</h3>
-                <p>Код: <strong>${code}</strong></p>
-                <p>Игроков: ${game.currentPlayers || 1}/${game.maxPlayers}</p>
-                <div class="info">
-                    <span>Капитан: ${game.captainName}</span>
-                    <button class="join-btn btn secondary" data-code="${code}">Присоединиться</button>
+                <div class="code">${code}</div>
+                <p>Капитан: ${game.captainName}</p>
+                <div class="game-info">
+                    <div class="players-count">
+                        <i class="fas fa-user"></i>
+                        <span>${game.currentPlayers || 1}/${game.maxPlayers}</span>
+                    </div>
+                    <span>${new Date(game.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                 </div>
+                <button class="join-btn btn secondary" data-code="${code}">
+                    <i class="fas fa-plug"></i> Присоединиться
+                </button>
             `;
             
             gamesList.appendChild(gameCard);
         });
         
-        // Добавить обработчики для кнопок присоединения
+        // Обработчики для кнопок
         document.querySelectorAll('.join-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -291,22 +371,57 @@ function loadActiveGames() {
                 joinGameBtn.click();
             });
         });
+        
+        // Клик по карточке игры
+        document.querySelectorAll('.game-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('join-btn')) {
+                    const code = card.querySelector('.join-btn').dataset.code;
+                    roomCodeInput.value = code;
+                    joinGameBtn.click();
+                }
+            });
+        });
+        
     }, (error) => {
         console.error('Ошибка загрузки игр:', error);
+        gamesList.innerHTML = `
+            <div class="no-games">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Ошибка загрузки игр. Проверьте подключение.</p>
+            </div>
+        `;
     });
 }
 
-// Загрузка страницы
-document.addEventListener('DOMContentLoaded', () => {
-    // Автоматический вход, если уже авторизован
-    if (auth.currentUser) {
-        loginBtn.click();
+// Очистка при закрытии
+window.addEventListener('beforeunload', () => {
+    if (gamesListener) {
+        gamesListener();
     }
-    
-    // Очистка слушателя при закрытии страницы
-    window.addEventListener('beforeunload', () => {
-        if (gamesListener) {
-            gamesListener();
-        }
-    });
+});
+
+// Enter для полей ввода
+subNameInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        createGameBtn.click();
+    }
+});
+
+roomCodeInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        joinGameBtn.click();
+    }
+});
+
+// Автоматический фокус
+document.addEventListener('DOMContentLoaded', () => {
+    if (auth.currentUser) {
+        // Уже авторизован
+    } else {
+        // Автофокус на поле ввода при загрузке
+        setTimeout(() => {
+            if (subNameInput) subNameInput.focus();
+        }, 500);
+    }
 });
