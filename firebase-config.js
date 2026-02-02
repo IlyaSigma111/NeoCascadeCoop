@@ -35,7 +35,6 @@ const auth = getAuth(app);
 const database = getDatabase(app);
 const provider = new GoogleAuthProvider();
 
-// Добавляем scope для получения email
 provider.addScope('email');
 provider.addScope('profile');
 
