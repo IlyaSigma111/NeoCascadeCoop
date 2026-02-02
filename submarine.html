@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подлодка NeoCascade</title>
+    <link rel="stylesheet" href="styles.css">
+    <script type="module" src="submarine.js"></script>
+</head>
+<body>
+    <div class="submarine-container">
+        <!-- Основная панель -->
+        <div class="submarine-main">
+            <div id="submarine-display">
+                <h2 id="sub-name">Загрузка...</h2>
+                <div id="mission-info">
+                    <p>Миссия: <span id="mission-text">-</span></p>
+                    <p>Глубина: <span id="depth">0</span> м</p>
+                    <p>Скорость: <span id="speed">0</span> узлов</p>
+                </div>
+                
+                <div id="map-display">
+                    <!-- Здесь будет отображаться карта -->
+                    <canvas id="map-canvas" width="600" height="400"></canvas>
+                </div>
+                
+                <div class="system-status">
+                    <div class="system" id="oxygen-system">
+                        <h3>Кислород</h3>
+                        <div class="progress-bar">
+                            <div class="progress good" id="oxygen-bar" style="width: 100%"></div>
+                        </div>
+                        <span id="oxygen-value">100%</span>
+                    </div>
+                    
+                    <div class="system" id="power-system">
+                        <h3>Энергия</h3>
+                        <div class="progress-bar">
+                            <div class="progress good" id="power-bar" style="width: 100%"></div>
+                        </div>
+                        <span id="power-value">100%</span>
+                    </div>
+                    
+                    <div class="system" id="hull-system">
+                        <h3>Корпус</h3>
+                        <div class="progress-bar">
+                            <div class="progress good" id="hull-bar" style="width: 100%"></div>
+                        </div>
+                        <span id="hull-value">100%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Панель управления (зависит от роли) -->
+            <div class="controls" id="controls-panel">
+                <h2 id="role-title">Загрузка роли...</h2>
+                <div id="role-controls">
+                    <!-- Контролы будут загружаться динамически в зависимости от роли -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Панель игроков -->
+        <div class="players-panel">
+            <h2>Экипаж</h2>
+            <div id="players-list" class="player-list">
+                <!-- Список игроков будет загружаться динамически -->
+            </div>
+            
+            <div id="alerts-panel">
+                <h3>Сигналы тревоги</h3>
+                <div id="alerts-list"></div>
+            </div>
+            
+            <button id="leave-game" class="btn danger" style="margin-top: 20px; width: 100%;">
+                🚪 Покинуть подлодку
+            </button>
+        </div>
+    </div>
+</body>
+</html>
