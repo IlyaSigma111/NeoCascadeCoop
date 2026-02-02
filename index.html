@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeoCascade Coop - Подводная Лодка</title>
+    <link rel="stylesheet" href="styles.css">
+    <script type="module" src="app.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚢 NeoCascade Coop</h1>
+            <p class="subtitle">Кооперативное управление подводной лодкой</p>
+        </header>
+
+        <div id="auth-section">
+            <div id="user-info" class="hidden">
+                <img id="user-avatar" src="" alt="Аватар">
+                <span id="user-name"></span>
+                <button id="logout-btn" class="btn secondary">Выйти</button>
+            </div>
+            <button id="login-btn" class="btn primary">Войти через Google</button>
+        </div>
+
+        <main id="main-content" class="hidden">
+            <div class="game-options">
+                <section class="card">
+                    <h2>Создать новую подлодку</h2>
+                    <input type="text" id="sub-name" placeholder="Название подлодки (например: 'Нептун')" maxlength="20">
+                    <button id="create-game" class="btn primary">🚢 Создать лодку</button>
+                </section>
+
+                <section class="card">
+                    <h2>Присоединиться к лодке</h2>
+                    <input type="text" id="room-code" placeholder="Код комнаты (например: ABC123)" maxlength="6" style="text-transform: uppercase;">
+                    <button id="join-game" class="btn secondary">🔗 Присоединиться</button>
+                </section>
+            </div>
+
+            <div class="active-games">
+                <h2>Активные подлодки</h2>
+                <div id="games-list"></div>
+            </div>
+        </main>
+
+        <div id="status-message" class="status"></div>
+    </div>
+</body>
+</html>
