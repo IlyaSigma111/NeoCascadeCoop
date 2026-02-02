@@ -1,1 +1,469 @@
+/* Стили для игровой страницы */
 
+.submarine-container {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 20px;
+    min-height: 100vh;
+    padding: 20px;
+    background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
+}
+
+.submarine-main {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Header */
+.submarine-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 20px;
+    border: 1px solid var(--border);
+}
+
+.sub-info h2 {
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+    color: var(--secondary);
+}
+
+.mission-info {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.mission-info p {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--gray);
+}
+
+.mission-info i {
+    color: var(--secondary);
+}
+
+.sub-status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.role-badge {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-align: center;
+    min-width: 120px;
+}
+
+/* Display */
+.submarine-display {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.map-container {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+}
+
+.map-container h3 {
+    margin-bottom: 15px;
+    color: var(--light);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#map-canvas {
+    width: 100%;
+    height: 400px;
+    background: #0a192f;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.coordinates {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+    color: var(--gray);
+    font-size: 0.9rem;
+}
+
+/* Systems Panel */
+.systems-panel {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+}
+
+.system-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.system-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px solid var(--border);
+    transition: all 0.3s ease;
+}
+
+.system-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.system-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.system-header i {
+    font-size: 1.5rem;
+    color: var(--secondary);
+}
+
+.system-header h4 {
+    font-size: 1.1rem;
+    color: var(--light);
+}
+
+.progress-bar {
+    height: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    margin: 10px 0;
+    overflow: hidden;
+}
+
+.progress {
+    height: 100%;
+    transition: width 0.3s ease, background 0.3s ease;
+}
+
+.progress.good { background: var(--success); }
+.progress.warning { background: var(--warning); }
+.progress.danger { background: var(--danger); }
+
+.system-value {
+    display: block;
+    text-align: center;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--light);
+}
+
+/* Controls Panel */
+.controls-panel {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    min-height: 300px;
+}
+
+#role-title {
+    color: var(--light);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#role-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.control-group {
+    margin-bottom: 20px;
+}
+
+.control-group h4 {
+    color: var(--light);
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+.slider-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.slider-container label {
+    min-width: 100px;
+    color: var(--gray);
+}
+
+.slider-container input[type="range"] {
+    flex: 1;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.slider-container input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    background: var(--secondary);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.slider-output {
+    min-width: 60px;
+    text-align: right;
+    color: var(--light);
+    font-weight: 600;
+}
+
+/* Sidebar */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.players-panel,
+.alerts-panel,
+.chat-panel {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+}
+
+.players-panel h3,
+.alerts-panel h3,
+.chat-panel h3 {
+    color: var(--light);
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Player List */
+.player-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.player {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.player:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.player-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    object-fit: cover;
+}
+
+.player-info {
+    flex: 1;
+}
+
+.player-name {
+    font-weight: 600;
+    color: var(--light);
+    margin-bottom: 2px;
+}
+
+.player-role {
+    font-size: 0.85rem;
+    color: var(--gray);
+}
+
+.player-you {
+    color: var(--success);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.player-offline {
+    opacity: 0.6;
+}
+
+/* Alerts */
+#alerts-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border-left: 3px solid var(--warning);
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.alert i {
+    color: var(--warning);
+    margin-top: 2px;
+}
+
+.alert span {
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--light);
+}
+
+/* Chat */
+#chat-messages {
+    height: 200px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    padding-right: 5px;
+}
+
+.chat-message {
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.chat-message .sender {
+    font-weight: 600;
+    color: var(--secondary);
+    margin-right: 5px;
+}
+
+.chat-message .time {
+    font-size: 0.8rem;
+    color: var(--gray);
+    float: right;
+}
+
+.chat-message .text {
+    display: block;
+    margin-top: 4px;
+    color: var(--light);
+}
+
+.chat-input {
+    display: flex;
+    gap: 10px;
+}
+
+#chat-input {
+    flex: 1;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--light);
+    font-size: 0.9rem;
+}
+
+#chat-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .submarine-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .sidebar {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .mission-info {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .submarine-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .sub-status {
+        align-items: stretch;
+    }
+    
+    .system-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    #map-canvas {
+        height: 300px;
+    }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary);
+}
