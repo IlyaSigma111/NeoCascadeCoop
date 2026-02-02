@@ -2,10 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>NeoCascade Coop - Подводная Лодка</title>
-    <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
@@ -40,7 +40,7 @@
 
         <div id="auth-section">
             <div id="user-info" class="hidden">
-                <img id="user-avatar" src="" alt="Аватар" crossorigin="anonymous">
+                <img id="user-avatar" src="" alt="Аватар" crossorigin="anonymous" referrerpolicy="no-referrer">
                 <div class="user-details">
                     <div id="user-name"></div>
                     <div class="user-email" id="user-email"></div>
@@ -57,16 +57,16 @@
         <main id="main-content" class="hidden">
             <div class="game-options">
                 <section class="card">
-                    <h2><i class="fas fa-plus-circle"></i> Создать новую подлодку</h2>
-                    <input type="text" id="sub-name" placeholder="Название подлодки (например: 'Нептун')" maxlength="20">
+                    <h2><i class="fas fa-plus-circle"></i> Создать лодку</h2>
+                    <input type="text" id="sub-name" placeholder="Название подлодки" maxlength="20">
                     <button id="create-game" class="btn primary">
                         <i class="fas fa-submarine"></i> Создать лодку
                     </button>
                 </section>
 
                 <section class="card">
-                    <h2><i class="fas fa-link"></i> Присоединиться к лодке</h2>
-                    <input type="text" id="room-code" placeholder="Код комнаты (например: ABC123)" maxlength="6" style="text-transform: uppercase;">
+                    <h2><i class="fas fa-link"></i> Присоединиться</h2>
+                    <input type="text" id="room-code" placeholder="Код комнаты" maxlength="6" style="text-transform: uppercase;">
                     <button id="join-game" class="btn secondary">
                         <i class="fas fa-plug"></i> Присоединиться
                     </button>
@@ -84,6 +84,10 @@
                 </div>
             </div>
         </main>
+
+        <div class="swipe-hint">
+            <i class="fas fa-hand-point-up"></i> Листайте вниз для обновления списка
+        </div>
 
         <div id="status-message" class="status"></div>
     </div>
