@@ -1,14 +1,18 @@
 import { 
-    auth, database, ref, onValue, update, remove, onChildAdded, onChildChanged
+    auth, database, ref, onValue, update, remove, onChildAdded, onChildChanged, onChildRemoved,
+    set, get, push, serverTimestamp
 } from './firebase-config.js';
 
 // Глобальные переменные
 let currentUser = null;
 let currentRoom = null;
 let currentRole = null;
+let userId = null;
 let gameRef = null;
 let playersListener = null;
 let submarineListener = null;
+let chatListener = null;
+let gameLoop = null;
 
 // Элементы DOM
 const subNameElement = document.getElementById('sub-name');
@@ -21,10 +25,17 @@ const powerBar = document.getElementById('power-bar');
 const powerValue = document.getElementById('power-value');
 const hullBar = document.getElementById('hull-bar');
 const hullValue = document.getElementById('hull-value');
+const posCoords = document.getElementById('pos-coords');
+const targetCoords = document.getElementById('target-coords');
 const roleTitle = document.getElementById('role-title');
+const currentRoleBadge = document.getElementById('current-role');
 const roleControls = document.getElementById('role-controls');
 const playersList = document.getElementById('players-list');
+const playersCount = document.getElementById('players-count');
 const alertsList = document.getElementById('alerts-list');
+const chatMessages = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const sendChatBtn = document.getElementById('send-chat');
 const leaveBtn = document.getElementById('leave-game');
 const mapCanvas = document.getElementById('map-canvas');
 
@@ -32,8 +43,9 @@ const mapCanvas = document.getElementById('map-canvas');
 async function init() {
     currentRoom = localStorage.getItem('neocascade_room');
     currentRole = localStorage.getItem('neocascade_role');
+    userId = localStorage.getItem('neocascade_userId');
     
-    if (!currentRoom || !currentRole) {
+    if (!currentRoom || !currentRole || !userId) {
         alert('Ошибка: данные игры не найдены');
         window.location.href = 'index.html';
         return;
@@ -43,10 +55,24 @@ async function init() {
     auth.onAuthStateChanged((user) => {
         if (user) {
             currentUser = user;
+            
+            // Проверить, совпадает ли пользователь
+            if (user.uid !== userId) {
+                alert('Несоответствие пользователя. Пожалуйста, войдите снова.');
+                window.location.href = 'index.html';
+                return;
+            }
+            
             loadGame();
+            setupChat();
+            startGameLoop();
         } else {
             window.location.href = 'index.html';
         }
+    }, (error) => {
+        console.error('Auth error:', error);
+        alert('Ошибка авторизации');
+        window.location.href = 'index.html';
     });
 }
 
@@ -57,7 +83,7 @@ function loadGame() {
     // Слушатель данных подлодки
     submarineListener = onValue(gameRef, (snapshot) => {
         if (!snapshot.exists()) {
-            alert('Игра не найдена!');
+            alert('Игра не найдена или была удалена!');
             window.location.href = 'index.html';
             return;
         }
@@ -65,6 +91,9 @@ function loadGame() {
         const game = snapshot.val();
         updateGameDisplay(game);
         updateControls(game);
+    }, (error) => {
+        console.error('Game load error:', error);
+        showAlert('Ошибка загрузки игры', 'error');
     });
     
     // Слушатель списка игроков
@@ -75,79 +104,186 @@ function loadGame() {
     
     // Слушатель изменений игроков
     onChildChanged(playersRef, (snapshot) => {
-        updatePlayerStatus(snapshot.key, snapshot.val());
+        const player = snapshot.val();
+        if (player.name) {
+            showAlert(`${player.name} изменил роль на ${player.role}`);
+        }
     });
     
     // Слушатель новых игроков
     onChildAdded(playersRef, (snapshot) => {
-        showAlert(`${snapshot.val().name} присоединился к экипажу как ${snapshot.val().role}`);
+        const player = snapshot.val();
+        if (snapshot.key !== userId && player.name) {
+            showAlert(`${player.name} присоединился как ${player.role}`, 'success');
+        }
     });
+    
+    // Слушатель ушедших игроков
+    onChildRemoved(playersRef, (snapshot) => {
+        const player = snapshot.val();
+        if (player && player.name && snapshot.key !== userId) {
+            showAlert(`${player.name} покинул подлодку`, 'warning');
+        }
+    });
+}
+
+// Настройка чата
+function setupChat() {
+    const chatRef = ref(database, `games/${currentRoom}/chat`);
+    
+    // Очистить старый слушатель
+    if (chatListener) {
+        chatListener();
+    }
+    
+    // Загрузить последние сообщения
+    chatListener = onValue(chatRef, (snapshot) => {
+        chatMessages.innerHTML = '';
+        
+        if (!snapshot.exists()) return;
+        
+        const messages = snapshot.val();
+        const messagesArray = Object.values(messages || {}).sort((a, b) => a.timestamp - b.timestamp);
+        
+        messagesArray.forEach(msg => {
+            addChatMessage(msg);
+        });
+        
+        // Автопрокрутка вниз
+        setTimeout(() => {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }, 100);
+    });
+    
+    // Отправка сообщений
+    sendChatBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+}
+
+// Отправить сообщение
+function sendMessage() {
+    const text = chatInput.value.trim();
+    if (!text || !currentUser) return;
+    
+    const chatRef = ref(database, `games/${currentRoom}/chat`);
+    const newMessageRef = push(chatRef);
+    
+    const message = {
+        text: text,
+        sender: currentUser.displayName || 'Аноним',
+        senderId: currentUser.uid,
+        role: currentRole,
+        timestamp: Date.now()
+    };
+    
+    set(newMessageRef, message)
+        .then(() => {
+            chatInput.value = '';
+            chatInput.focus();
+        })
+        .catch(error => {
+            console.error('Chat error:', error);
+            showAlert('Ошибка отправки сообщения', 'error');
+        });
+}
+
+// Добавить сообщение в чат
+function addChatMessage(msg) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'chat-message';
+    
+    const time = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const isOwn = msg.senderId === currentUser?.uid;
+    
+    messageDiv.innerHTML = `
+        <span class="sender" style="color: ${isOwn ? '#00a8ff' : '#2ecc71'}">${msg.sender}</span>
+        <span class="role">(${msg.role})</span>
+        <span class="time">${time}</span>
+        <span class="text">${msg.text}</span>
+    `;
+    
+    chatMessages.appendChild(messageDiv);
 }
 
 // Обновление отображения игры
 function updateGameDisplay(game) {
-    subNameElement.textContent = game.name;
-    missionText.textContent = game.submarine.mission;
-    depthElement.textContent = Math.abs(game.submarine.depth);
-    speedElement.textContent = game.submarine.speed;
+    subNameElement.textContent = game.name || 'Без названия';
+    missionText.textContent = game.submarine?.mission || 'Патрулирование';
+    
+    const depth = Math.abs(game.submarine?.depth || 0);
+    const speed = game.submarine?.speed || 0;
+    
+    depthElement.textContent = depth;
+    speedElement.textContent = speed;
     
     // Обновить системы
-    updateSystemDisplay('oxygen', game.submarine.oxygen);
-    updateSystemDisplay('power', game.submarine.power);
-    updateSystemDisplay('hull', game.submarine.hull);
+    updateSystemDisplay('oxygen', game.submarine?.oxygen || 100);
+    updateSystemDisplay('power', game.submarine?.power || 100);
+    updateSystemDisplay('hull', game.submarine?.hull || 100);
+    
+    // Обновить координаты
+    const loc = game.submarine?.location || {x: 0, y: 0};
+    const target = game.submarine?.target || {x: 10, y: 10};
+    
+    posCoords.textContent = `X:${loc.x.toFixed(1)}, Y:${loc.y.toFixed(1)}`;
+    targetCoords.textContent = `X:${target.x}, Y:${target.y}`;
     
     // Обновить карту
-    updateMap(game.submarine.location, game.submarine.target);
+    updateMap(loc, target);
+    
+    // Обновить роль
+    currentRoleBadge.textContent = currentRole;
+    roleTitle.textContent = `Ваша роль: ${currentRole}`;
     
     // Показать сигналы тревоги
-    updateAlerts(game.submarine.alerts);
+    if (game.submarine?.alerts) {
+        updateAlerts(game.submarine.alerts);
+    }
 }
 
-// Обновление отображения системы
+// Обновить отображение системы
 function updateSystemDisplay(system, value) {
     const bar = document.getElementById(`${system}-bar`);
     const text = document.getElementById(`${system}-value`);
     
-    bar.style.width = `${value}%`;
-    text.textContent = `${value}%`;
+    if (!bar || !text) return;
     
-    // Изменить цвет в зависимости от значения
+    const safeValue = Math.max(0, Math.min(100, value));
+    bar.style.width = `${safeValue}%`;
+    text.textContent = `${Math.round(safeValue)}%`;
+    
+    // Обновить цвет
     bar.className = 'progress';
-    if (value < 20) {
+    if (safeValue < 20) {
         bar.classList.add('danger');
-    } else if (value < 50) {
+    } else if (safeValue < 50) {
         bar.classList.add('warning');
     } else {
         bar.classList.add('good');
     }
 }
 
-// Обновление карты
+// Обновить карту
 function updateMap(location, target) {
     const ctx = mapCanvas.getContext('2d');
     const width = mapCanvas.width;
     const height = mapCanvas.height;
     
-    // Очистить canvas
+    // Очистить
     ctx.clearRect(0, 0, width, height);
     
-    // Нарисовать фон (океан)
+    // Фон
     ctx.fillStyle = '#0a192f';
     ctx.fillRect(0, 0, width, height);
     
-    // Нарисовать сетку
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    // Сетка
+    ctx.strokeStyle = 'rgba(0, 168, 255, 0.1)';
     ctx.lineWidth = 1;
     
-    // Горизонтальные линии
-    for (let y = 0; y < height; y += 50) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-    }
-    
-    // Вертикальные линии
     for (let x = 0; x < width; x += 50) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
@@ -155,21 +291,28 @@ function updateMap(location, target) {
         ctx.stroke();
     }
     
-    // Нормализовать координаты для отображения
-    const scale = 10;
+    for (let y = 0; y < height; y += 50) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+    }
+    
+    // Масштаб
+    const scale = 15;
     const centerX = width / 2;
     const centerY = height / 2;
     
-    // Текущая позиция
-    const posX = centerX + location.x * scale;
-    const posY = centerY + location.y * scale;
+    // Цель
+    const targetX = centerX + (target?.x || 10) * scale;
+    const targetY = centerY + (target?.y || 10) * scale;
     
-    // Целевая позиция
-    const targetX = centerX + target.x * scale;
-    const targetY = centerY + target.y * scale;
+    // Позиция
+    const posX = centerX + (location?.x || 0) * scale;
+    const posY = centerY + (location?.y || 0) * scale;
     
-    // Нарисовать линию к цели
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    // Линия к цели
+    ctx.strokeStyle = 'rgba(0, 168, 255, 0.3)';
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
     ctx.moveTo(posX, posY);
@@ -177,111 +320,92 @@ function updateMap(location, target) {
     ctx.stroke();
     ctx.setLineDash([]);
     
-    // Нарисовать цель
-    ctx.fillStyle = '#fbbc05';
+    // Цель (крестик)
+    ctx.strokeStyle = '#f39c12';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(targetX, targetY, 8, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(targetX - 10, targetY);
+    ctx.lineTo(targetX + 10, targetY);
+    ctx.moveTo(targetX, targetY - 10);
+    ctx.lineTo(targetX, targetY + 10);
+    ctx.stroke();
     
-    // Нарисовать подлодку
-    ctx.fillStyle = '#1a73e8';
+    // Подлодка
+    ctx.fillStyle = '#0066cc';
     ctx.beginPath();
     ctx.arc(posX, posY, 12, 0, Math.PI * 2);
     ctx.fill();
     
-    // Добавить метку подлодки
+    // Обводка подлодки
+    ctx.strokeStyle = '#00a8ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(posX, posY, 12, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Метка подлодки
     ctx.fillStyle = '#ffffff';
-    ctx.font = '12px Arial';
+    ctx.font = 'bold 12px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('Мы здесь', posX, posY - 20);
+    ctx.fillText('▲', posX, posY - 15);
 }
 
-// Обновление списка игроков
+// Обновить список игроков
 function updatePlayersList(players) {
     playersList.innerHTML = '';
     
-    if (!players) return;
+    if (!players) {
+        playersCount.textContent = '0';
+        return;
+    }
     
-    Object.entries(players).forEach(([uid, player]) => {
+    const playerArray = Object.entries(players);
+    playersCount.textContent = playerArray.length;
+    
+    playerArray.forEach(([uid, player]) => {
         const playerElement = document.createElement('div');
-        playerElement.className = 'player';
-        playerElement.id = `player-${uid}`;
-        
-        const roleClass = getRoleClass(player.role);
+        playerElement.className = `player ${player.online ? '' : 'player-offline'}`;
         
         playerElement.innerHTML = `
-            <img src="${player.avatar || 'https://via.placeholder.com/40'}" 
+            <img src="${player.avatar || 'https://via.placeholder.com/40/0066cc/ffffff?text=' + (player.name?.charAt(0) || '?')}" 
                  class="player-avatar" 
-                 alt="${player.name}">
+                 alt="${player.name}" 
+                 crossorigin="anonymous">
             <div class="player-info">
-                <strong>${player.name}</strong>
-                <div class="player-role">
-                    <span class="role-badge ${roleClass}">${player.role}</span>
-                </div>
+                <div class="player-name">${player.name || 'Аноним'}</div>
+                <div class="player-role">${player.role || 'Экипаж'}</div>
             </div>
-            ${uid === currentUser.uid ? '<span>👤 Вы</span>' : ''}
+            ${uid === userId ? '<span class="player-you">Вы</span>' : ''}
         `;
         
         playersList.appendChild(playerElement);
     });
 }
 
-// Обновление статуса игрока
-function updatePlayerStatus(uid, player) {
-    const playerElement = document.getElementById(`player-${uid}`);
-    if (playerElement) {
-        const roleClass = getRoleClass(player.role);
-        playerElement.innerHTML = `
-            <img src="${player.avatar || 'https://via.placeholder.com/40'}" 
-                 class="player-avatar" 
-                 alt="${player.name}">
-            <div class="player-info">
-                <strong>${player.name}</strong>
-                <div class="player-role">
-                    <span class="role-badge ${roleClass}">${player.role}</span>
-                </div>
-            </div>
-            ${uid === currentUser.uid ? '<span>👤 Вы</span>' : ''}
-        `;
-    }
-}
-
-// Получить CSS класс для роли
-function getRoleClass(role) {
-    const roleMap = {
-        'Капитан': 'captain',
-        'Штурман': 'navigator',
-        'Инженер': 'engineer',
-        'Акустик': 'sonarman',
-        'Оружейник': 'weapons',
-        'Связист': 'comms'
-    };
-    return roleMap[role] || 'crew';
-}
-
-// Обновление элементов управления в зависимости от роли
+// Обновить элементы управления
 function updateControls(game) {
-    roleTitle.textContent = `Вы: ${currentRole}`;
     roleControls.innerHTML = '';
+    
+    const submarine = game.submarine || {};
     
     switch(currentRole) {
         case 'Капитан':
-            createCaptainControls(game);
+            createCaptainControls(submarine);
             break;
         case 'Штурман':
-            createNavigatorControls(game);
+            createNavigatorControls(submarine);
             break;
         case 'Инженер':
-            createEngineerControls(game);
+            createEngineerControls(submarine);
             break;
         case 'Акустик':
-            createSonarmanControls(game);
+            createSonarmanControls();
             break;
         case 'Оружейник':
-            createWeaponsControls(game);
+            createWeaponsControls();
             break;
         case 'Связист':
-            createCommsControls(game);
+            createCommsControls();
             break;
         default:
             roleControls.innerHTML = '<p>Наблюдатель. Ждите указаний капитана.</p>';
@@ -289,272 +413,295 @@ function updateControls(game) {
 }
 
 // Элементы управления для Капитана
-function createCaptainControls(game) {
-    const controls = `
+function createCaptainControls(sub) {
+    roleControls.innerHTML = `
         <div class="control-group">
-            <h3>Управление подлодкой</h3>
+            <h4>Управление подлодкой</h4>
             <div class="slider-container">
                 <label>Глубина:</label>
-                <input type="range" id="depth-slider" min="0" max="500" value="${Math.abs(game.submarine.depth)}">
-                <span id="depth-output">${Math.abs(game.submarine.depth)} м</span>
+                <input type="range" id="depth-slider" min="0" max="500" value="${Math.abs(sub.depth || 0)}">
+                <span class="slider-output" id="depth-output">${Math.abs(sub.depth || 0)} м</span>
             </div>
             <div class="slider-container">
                 <label>Скорость:</label>
-                <input type="range" id="speed-slider" min="0" max="30" value="${game.submarine.speed}">
-                <span id="speed-output">${game.submarine.speed} узлов</span>
+                <input type="range" id="speed-slider" min="0" max="30" value="${sub.speed || 0}">
+                <span class="slider-output" id="speed-output">${sub.speed || 0} узлов</span>
             </div>
         </div>
         
         <div class="control-group">
-            <h3>Миссия</h3>
+            <h4>Миссия</h4>
             <select id="mission-select">
-                <option value="Патрулирование" ${game.submarine.mission === 'Патрулирование' ? 'selected' : ''}>Патрулирование</option>
-                <option value="Разведка" ${game.submarine.mission === 'Разведка' ? 'selected' : ''}>Разведка</option>
-                <option value="Спасение" ${game.submarine.mission === 'Спасение' ? 'selected' : ''}>Спасение</option>
-                <option value="Атака" ${game.submarine.mission === 'Атака' ? 'selected' : ''}>Атака</option>
-                <option value="Скрытность" ${game.submarine.mission === 'Скрытность' ? 'selected' : ''}>Скрытность</option>
+                <option value="Патрулирование" ${sub.mission === 'Патрулирование' ? 'selected' : ''}>Патрулирование</option>
+                <option value="Разведка" ${sub.mission === 'Разведка' ? 'selected' : ''}>Разведка</option>
+                <option value="Спасение" ${sub.mission === 'Спасение' ? 'selected' : ''}>Спасение</option>
+                <option value="Атака" ${sub.mission === 'Атака' ? 'selected' : ''}>Атака</option>
+                <option value="Скрытность" ${sub.mission === 'Скрытность' ? 'selected' : ''}>Скрытность</option>
             </select>
-            <button id="change-mission" class="btn primary">Изменить миссию</button>
+            <button id="change-mission" class="btn primary small" style="margin-top: 10px;">
+                <i class="fas fa-check"></i> Изменить миссию
+            </button>
         </div>
         
         <div class="control-group">
-            <h3>Аварийные команды</h3>
-            <button id="emergency-surface" class="btn warning">Аварийное всплытие</button>
-            <button id="silent-running" class="btn secondary">Тихий ход</button>
+            <h4>Аварийные команды</h4>
+            <button id="emergency-surface" class="btn warning small">
+                <i class="fas fa-exclamation-triangle"></i> Аварийное всплытие
+            </button>
+            <button id="silent-running" class="btn secondary small">
+                <i class="fas fa-volume-mute"></i> Тихий ход
+            </button>
         </div>
     `;
     
-    roleControls.innerHTML = controls;
+    // Обработчики
+    const depthSlider = document.getElementById('depth-slider');
+    const speedSlider = document.getElementById('speed-slider');
     
-    // Обработчики событий
-    document.getElementById('depth-slider').addEventListener('input', (e) => {
+    depthSlider?.addEventListener('input', (e) => {
         const value = e.target.value;
         document.getElementById('depth-output').textContent = `${value} м`;
-        updateGameData({ 'submarine/depth': -parseInt(value) });
     });
     
-    document.getElementById('speed-slider').addEventListener('input', (e) => {
+    depthSlider?.addEventListener('change', (e) => {
+        updateGameData({ 'submarine/depth': -parseInt(e.target.value) });
+    });
+    
+    speedSlider?.addEventListener('input', (e) => {
         const value = e.target.value;
         document.getElementById('speed-output').textContent = `${value} узлов`;
-        updateGameData({ 'submarine/speed': parseInt(value) });
     });
     
-    document.getElementById('change-mission').addEventListener('click', () => {
+    speedSlider?.addEventListener('change', (e) => {
+        updateGameData({ 'submarine/speed': parseInt(e.target.value) });
+    });
+    
+    document.getElementById('change-mission')?.addEventListener('click', () => {
         const mission = document.getElementById('mission-select').value;
         updateGameData({ 'submarine/mission': mission });
-        showAlert(`Миссия изменена на: ${mission}`);
+        showAlert(`Миссия изменена на: ${mission}`, 'success');
     });
     
-    document.getElementById('emergency-surface').addEventListener('click', () => {
+    document.getElementById('emergency-surface')?.addEventListener('click', () => {
         updateGameData({ 'submarine/depth': 0, 'submarine/speed': 0 });
-        showAlert('АВАРИЯ! Экстренное всплытие!');
+        showAlert('АВАРИЯ! Экстренное всплытие!', 'warning');
     });
     
-    document.getElementById('silent-running').addEventListener('click', () => {
+    document.getElementById('silent-running')?.addEventListener('click', () => {
         updateGameData({ 'submarine/speed': 5 });
-        showAlert('Включен режим тихого хода');
+        showAlert('Включен режим тихого хода', 'info');
     });
 }
 
 // Элементы управления для Штурмана
-function createNavigatorControls(game) {
-    const controls = `
+function createNavigatorControls(sub) {
+    roleControls.innerHTML = `
         <div class="control-group">
-            <h3>Навигация</h3>
-            <p>Текущие координаты: X=${game.submarine.location.x}, Y=${game.submarine.location.y}</p>
+            <h4>Навигация</h4>
             <div class="slider-container">
                 <label>Цель X:</label>
-                <input type="range" id="target-x" min="-20" max="20" value="${game.submarine.target.x}">
-                <span id="target-x-output">${game.submarine.target.x}</span>
+                <input type="range" id="target-x" min="-20" max="20" value="${sub.target?.x || 10}">
+                <span class="slider-output" id="target-x-output">${sub.target?.x || 10}</span>
             </div>
             <div class="slider-container">
                 <label>Цель Y:</label>
-                <input type="range" id="target-y" min="-20" max="20" value="${game.submarine.target.y}">
-                <span id="target-y-output">${game.submarine.target.y}</span>
+                <input type="range" id="target-y" min="-20" max="20" value="${sub.target?.y || 10}">
+                <span class="slider-output" id="target-y-output">${sub.target?.y || 10}</span>
             </div>
-            <button id="set-course" class="btn primary">Установить курс</button>
+            <button id="set-course" class="btn primary small" style="margin-top: 10px;">
+                <i class="fas fa-compass"></i> Установить курс
+            </button>
         </div>
         
         <div class="control-group">
-            <h3>Карта</h3>
-            <button id="scan-area" class="btn secondary">Сканировать область</button>
-            <button id="plot-course" class="btn secondary">Проложить маршрут</button>
+            <h4>Карта</h4>
+            <button id="scan-area" class="btn secondary small">
+                <i class="fas fa-satellite"></i> Сканировать область
+            </button>
+            <button id="plot-course" class="btn secondary small">
+                <i class="fas fa-route"></i> Проложить маршрут
+            </button>
         </div>
     `;
     
-    roleControls.innerHTML = controls;
+    const targetX = document.getElementById('target-x');
+    const targetY = document.getElementById('target-y');
     
-    // Обработчики событий
-    document.getElementById('target-x').addEventListener('input', (e) => {
-        const value = e.target.value;
-        document.getElementById('target-x-output').textContent = value;
+    targetX?.addEventListener('input', (e) => {
+        document.getElementById('target-x-output').textContent = e.target.value;
     });
     
-    document.getElementById('target-y').addEventListener('input', (e) => {
-        const value = e.target.value;
-        document.getElementById('target-y-output').textContent = value;
+    targetY?.addEventListener('input', (e) => {
+        document.getElementById('target-y-output').textContent = e.target.value;
     });
     
-    document.getElementById('set-course').addEventListener('click', () => {
-        const targetX = parseInt(document.getElementById('target-x').value);
-        const targetY = parseInt(document.getElementById('target-y').value);
+    document.getElementById('set-course')?.addEventListener('click', () => {
+        const x = parseInt(targetX.value);
+        const y = parseInt(targetY.value);
         
         updateGameData({ 
-            'submarine/target/x': targetX,
-            'submarine/target/y': targetY
+            'submarine/target/x': x,
+            'submarine/target/y': y
         });
         
-        showAlert(`Курс установлен на координаты: X=${targetX}, Y=${targetY}`);
+        showAlert(`Курс установлен: X=${x}, Y=${y}`, 'success');
     });
     
-    document.getElementById('scan-area').addEventListener('click', () => {
-        showAlert('Сканирование области... Объектов не обнаружено');
+    document.getElementById('scan-area')?.addEventListener('click', () => {
+        showAlert('Сканирование области... Целей не обнаружено', 'info');
     });
     
-    document.getElementById('plot-course').addEventListener('click', () => {
-        showAlert('Маршрут проложен. Следуйте указаниям на карте');
+    document.getElementById('plot-course')?.addEventListener('click', () => {
+        showAlert('Маршрут проложен. Следуйте указаниям на карте', 'info');
     });
 }
 
-// Элементы управления для Инженера
-function createEngineerControls(game) {
-    const controls = `
+// Элементы управления для Инженера (сокращённо)
+function createEngineerControls(sub) {
+    roleControls.innerHTML = `
         <div class="control-group">
-            <h3>Распределение энергии</h3>
+            <h4>Распределение энергии</h4>
             <div class="slider-container">
                 <label>Двигатели:</label>
-                <input type="range" id="power-engines" min="0" max="100" value="50">
-                <span id="power-engines-output">50%</span>
+                <input type="range" id="power-engines" min="0" max="100" value="40">
+                <span class="slider-output" id="power-engines-output">40%</span>
             </div>
             <div class="slider-container">
-                <label>Гидролокатор:</label>
+                <label>Сонар:</label>
                 <input type="range" id="power-sonar" min="0" max="100" value="30">
-                <span id="power-sonar-output">30%</span>
+                <span class="slider-output" id="power-sonar-output">30%</span>
             </div>
             <div class="slider-container">
                 <label>Жизнеобеспечение:</label>
-                <input type="range" id="power-life" min="0" max="100" value="20">
-                <span id="power-life-output">20%</span>
+                <input type="range" id="power-life" min="0" max="100" value="30">
+                <span class="slider-output" id="power-life-output">30%</span>
             </div>
-            <button id="apply-power" class="btn primary">Применить распределение</button>
+            <button id="apply-power" class="btn primary small" style="margin-top: 10px;">
+                <i class="fas fa-bolt"></i> Применить
+            </button>
         </div>
         
         <div class="control-group">
-            <h3>Ремонт систем</h3>
-            <div class="system-status">
-                <div class="system">
-                    <h4>Двигатели: ${game.submarine.systems.engines}%</h4>
-                    <button class="btn small" onclick="repairSystem('engines')">Ремонт</button>
-                </div>
-                <div class="system">
-                    <h4>Гидролокатор: ${game.submarine.systems.sonar}%</h4>
-                    <button class="btn small" onclick="repairSystem('sonar')">Ремонт</button>
-                </div>
-                <div class="system">
-                    <h4>Связь: ${game.submarine.systems.comms}%</h4>
-                    <button class="btn small" onclick="repairSystem('comms')">Ремонт</button>
-                </div>
-            </div>
+            <h4>Ремонт</h4>
+            <button onclick="repairSystem('hull')" class="btn secondary small">
+                <i class="fas fa-tools"></i> Ремонт корпуса
+            </button>
+            <button onclick="repairSystem('power')" class="btn secondary small">
+                <i class="fas fa-car-battery"></i> Восстановить энергию
+            </button>
         </div>
     `;
     
-    roleControls.innerHTML = controls;
-    
-    // Обработчики событий для ползунков
     ['engines', 'sonar', 'life'].forEach(type => {
         const slider = document.getElementById(`power-${type}`);
         const output = document.getElementById(`power-${type}-output`);
         
-        slider.addEventListener('input', (e) => {
+        slider?.addEventListener('input', (e) => {
             output.textContent = `${e.target.value}%`;
         });
     });
     
-    document.getElementById('apply-power').addEventListener('click', () => {
+    document.getElementById('apply-power')?.addEventListener('click', () => {
         const engines = parseInt(document.getElementById('power-engines').value);
         const sonar = parseInt(document.getElementById('power-sonar').value);
         const life = parseInt(document.getElementById('power-life').value);
         
         if (engines + sonar + life !== 100) {
-            showAlert('Сумма распределения должна быть 100%!', 'error');
+            showAlert('Сумма должна быть 100%!', 'error');
             return;
         }
         
-        showAlert(`Энергия распределена: Двигатели ${engines}%, Гидролокатор ${sonar}%, Жизнеобеспечение ${life}%`);
+        showAlert(`Энергия распределена: Двигатели ${engines}%, Сонар ${sonar}%, Жизнеобеспечение ${life}%`, 'success');
     });
 }
 
-// Дополнительные роли (сокращённо)
-function createSonarmanControls(game) {
+// Простые версии для других ролей
+function createSonarmanControls() {
     roleControls.innerHTML = `
         <div class="control-group">
-            <h3>Гидролокатор</h3>
-            <button id="active-sonar" class="btn primary">Активный гидролокатор</button>
-            <button id="passive-sonar" class="btn secondary">Пассивный режим</button>
-            <div id="sonar-display" style="margin-top: 20px; background: #000; height: 200px; border-radius: 8px;">
-                <!-- Здесь будет отображение сонара -->
-            </div>
+            <h4>Гидролокатор</h4>
+            <button id="active-sonar" class="btn primary small">
+                <i class="fas fa-broadcast-tower"></i> Активный режим
+            </button>
+            <button id="passive-sonar" class="btn secondary small">
+                <i class="fas fa-ear-listen"></i> Пассивный режим
+            </button>
         </div>
         
         <div class="control-group">
-            <h3>Обнаружение</h3>
-            <div id="contacts-list">
-                <p>Контакт #1: Неопознанная субмарина, пеленг 045, расстояние 5000м</p>
-                <p>Контакт #2: Кит, пеленг 120, расстояние 2000м</p>
+            <h4>Обнаружено:</h4>
+            <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-size: 0.9rem;">
+                <p>▸ Контакт #1: Субмарина, 045°, 5км</p>
+                <p>▸ Контакт #2: Кит, 120°, 2км</p>
+                <p>▸ Контакт #3: Риф, 210°, 1км</p>
             </div>
         </div>
     `;
 }
 
-function createWeaponsControls(game) {
+function createWeaponsControls() {
     roleControls.innerHTML = `
         <div class="control-group">
-            <h3>Вооружение</h3>
-            <p>Торпед в наличии: 6</p>
-            <button id="load-torpedo" class="btn primary">Зарядить торпеду</button>
-            <button id="fire-torpedo" class="btn danger">Выпустить торпеду</button>
-            
-            <div class="control-group">
-                <h4>Выбор цели</h4>
-                <select id="target-select">
-                    <option value="contact1">Контакт #1 (субмарина)</option>
-                    <option value="contact2">Контакт #2 (кит)</option>
-                </select>
-            </div>
+            <h4>Вооружение</h4>
+            <p>Торпед: 6/6</p>
+            <button id="load-torpedo" class="btn primary small">
+                <i class="fas fa-missile"></i> Зарядить торпеду
+            </button>
+            <button id="fire-torpedo" class="btn danger small">
+                <i class="fas fa-fire"></i> Выпустить торпеду
+            </button>
         </div>
         
         <div class="control-group">
-            <h3>Системы ПВО</h3>
-            <button id="activate-countermeasures" class="btn warning">Активировать помехи</button>
-            <button id="evade" class="btn secondary">Маневр уклонения</button>
+            <h4>ПВО</h4>
+            <button id="activate-countermeasures" class="btn warning small">
+                <i class="fas fa-biohazard"></i> Помехи
+            </button>
+            <button id="evade" class="btn secondary small">
+                <i class="fas fa-random"></i> Маневр
+            </button>
         </div>
     `;
 }
 
-function createCommsControls(game) {
+function createCommsControls() {
     roleControls.innerHTML = `
         <div class="control-group">
-            <h3>Связь</h3>
-            <textarea id="message-input" placeholder="Введите сообщение..." rows="3" style="width: 100%;"></textarea>
-            <button id="send-message" class="btn primary">Отправить сообщение</button>
-            
-            <div class="control-group">
-                <h4>Частоты</h4>
-                <button class="btn small" onclick="tuneFrequency(121.5)">Аварийная 121.5 МГц</button>
-                <button class="btn small" onclick="tuneFrequency(243.0)">Военная 243.0 МГц</button>
-                <button class="btn small" onclick="tuneFrequency(156.8)">Морская 156.8 МГц</button>
+            <h4>Связь</h4>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button onclick="tuneFrequency(121.5)" class="btn small">
+                    <i class="fas fa-life-ring"></i> 121.5 МГц (Аварийная)
+                </button>
+                <button onclick="tuneFrequency(243.0)" class="btn small">
+                    <i class="fas fa-shield-alt"></i> 243.0 МГц (Военная)
+                </button>
+                <button onclick="tuneFrequency(156.8)" class="btn small">
+                    <i class="fas fa-ship"></i> 156.8 МГц (Морская)
+                </button>
             </div>
         </div>
         
         <div class="control-group">
-            <h3>Перехваченные сообщения</h3>
-            <div id="intercepted-messages">
-                <p>[12:34] Береговая охрана: Штормовое предупреждение</p>
-                <p>[13:45] Неопознанный: Следите за сектором 7</p>
+            <h4>Перехвачено:</h4>
+            <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; font-size: 0.9rem;">
+                <p>[12:34] Береговая охрана: Шторм в секторе 7</p>
+                <p>[13:45] Неизвестный: ...следите за 045...</p>
             </div>
         </div>
     `;
 }
+
+// Глобальные функции для кнопок
+window.repairSystem = function(system) {
+    updateGameData({ 
+        [`submarine/${system}`]: 100
+    });
+    showAlert(`Система ${system} отремонтирована!`, 'success');
+};
+
+window.tuneFrequency = function(freq) {
+    showAlert(`Настроена частота ${freq} МГц`, 'info');
+};
 
 // Обновление данных в Firebase
 function updateGameData(updates) {
@@ -566,25 +713,36 @@ function updateGameData(updates) {
     });
     
     update(gameRef, gameUpdates).catch(error => {
-        console.error('Ошибка обновления:', error);
-        showAlert('Ошибка обновления данных', 'error');
+        console.error('Update error:', error);
+        showAlert('Ошибка обновления', 'error');
     });
 }
 
 // Показать сигнал тревоги
 function showAlert(message, type = 'info') {
     const alertElement = document.createElement('div');
-    alertElement.className = `alert ${type}`;
-    alertElement.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    alertElement.className = 'alert';
+    
+    const iconMap = {
+        success: 'check-circle',
+        error: 'exclamation-circle',
+        warning: 'exclamation-triangle',
+        info: 'info-circle'
+    };
+    
+    alertElement.innerHTML = `
+        <i class="fas fa-${iconMap[type] || 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
     
     alertsList.prepend(alertElement);
     
-    // Удалить старое сообщение, если их слишком много
+    // Ограничить количество сообщений
     if (alertsList.children.length > 5) {
         alertsList.removeChild(alertsList.lastChild);
     }
     
-    // Автоматическое удаление через 10 секунд
+    // Автоудаление
     setTimeout(() => {
         if (alertElement.parentNode) {
             alertElement.remove();
@@ -592,99 +750,62 @@ function showAlert(message, type = 'info') {
     }, 10000);
 }
 
-// Обновление списка сигналов тревоги
+// Обновить список сигналов
 function updateAlerts(alerts) {
     alertsList.innerHTML = '';
     
     if (!alerts || alerts.length === 0) {
-        alertsList.innerHTML = '<p>Нет активных сигналов</p>';
+        alertsList.innerHTML = `
+            <div class="alert">
+                <i class="fas fa-info-circle"></i>
+                <span>Системы в норме</span>
+            </div>
+        `;
         return;
     }
     
     alerts.forEach(alert => {
-        const alertElement = document.createElement('div');
-        alertElement.className = 'alert';
-        alertElement.textContent = alert;
-        alertsList.appendChild(alertElement);
+        showAlert(alert, 'warning');
     });
 }
 
-// Функция ремонта системы (глобальная для кнопок)
-window.repairSystem = function(system) {
-    updateGameData({ 
-        [`submarine/systems/${system}`]: 100,
-        'submarine/power': 90  // Ремонт потребляет энергию
-    });
-    showAlert(`Система ${system} отремонтирована!`);
-};
-
-// Покинуть игру
-leaveBtn.addEventListener('click', async () => {
-    if (confirm('Покинуть подлодку?')) {
+// Игровой цикл
+function startGameLoop() {
+    if (gameLoop) clearInterval(gameLoop);
+    
+    gameLoop = setInterval(async () => {
+        if (!gameRef) return;
+        
         try {
-            // Удалить игрока из списка
-            await update(gameRef, {
-                [`players/${currentUser.uid}`]: null,
-                'currentPlayers': Math.max(0, (await get(gameRef)).val().currentPlayers - 1)
-            });
-            
-            // Если игроков не осталось, удалить игру
             const snapshot = await get(gameRef);
+            if (!snapshot.exists()) return;
+            
             const game = snapshot.val();
-            if (!game.players || Object.keys(game.players).length === 0) {
-                await remove(gameRef);
+            const sub = game.submarine || {};
+            
+            // Автоматическое движение к цели
+            if (sub.speed > 0) {
+                const loc = sub.location || {x: 0, y: 0};
+                const target = sub.target || {x: 10, y: 10};
+                const speed = sub.speed || 0;
+                
+                const dx = target.x - loc.x;
+                const dy = target.y - loc.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance > 0.1) {
+                    const ratio = (speed * 0.01) / distance;
+                    const newX = loc.x + dx * ratio;
+                    const newY = loc.y + dy * ratio;
+                    
+                    updateGameData({
+                        'submarine/location/x': newX,
+                        'submarine/location/y': newY
+                    });
+                }
             }
             
-            // Очистить localStorage и вернуться на главную
-            localStorage.removeItem('neocascade_room');
-            localStorage.removeItem('neocascade_role');
-            window.location.href = 'index.html';
-            
-        } catch (error) {
-            console.error('Ошибка при выходе:', error);
-            alert('Ошибка при выходе из игры');
-        }
-    }
-});
-
-// Автоматическое движение к цели
-function simulateMovement(game) {
-    const location = game.submarine.location;
-    const target = game.submarine.target;
-    const speed = game.submarine.speed;
-    
-    // Рассчитать направление
-    const dx = target.x - location.x;
-    const dy = target.y - location.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    if (distance > 0.1 && speed > 0) {
-        // Двигаться к цели
-        const moveDistance = speed * 0.01; // Скорость движения
-        const ratio = moveDistance / distance;
-        
-        const newX = location.x + dx * ratio;
-        const newY = location.y + dy * ratio;
-        
-        // Обновить позицию
-        updateGameData({
-            'submarine/location/x': newX,
-            'submarine/location/y': newY
-        });
-        
-        // Потребление кислорода и энергии
-        updateGameData({
-            'submarine/oxygen': Math.max(0, game.submarine.oxygen - 0.01),
-            'submarine/power': Math.max(0, game.submarine.power - 0.02)
-        });
-    }
-}
-
-// Очистка при закрытии
-window.addEventListener('beforeunload', () => {
-    if (playersListener) playersListener();
-    if (submarineListener) submarineListener();
-});
-
-// Запустить игру
-init();
+            // Потребление ресурсов
+            const updates = {};
+            if (sub.oxygen > 0) updates['submarine/oxygen'] = Math.max(0, sub.oxygen - 0.01);
+            if (
