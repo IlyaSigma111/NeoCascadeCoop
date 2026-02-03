@@ -35,9 +35,6 @@ const auth = getAuth(app);
 const database = getDatabase(app);
 const provider = new GoogleAuthProvider();
 
-provider.addScope('email');
-provider.addScope('profile');
-
 export { 
     auth, 
     database, 
